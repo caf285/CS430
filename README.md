@@ -1,5 +1,7 @@
 # CS430Project1
 
+Both included images are the same, except one is encoded in P3, and the other is P6.
+
 C File Name = "main.c"
 argv[1] = input file name
 argv[2] = output file name
