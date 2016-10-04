@@ -1,14 +1,14 @@
 [
 	{
 		"type": "camera",
-		"width": 1.0,
-		"height": 6.0
+		"width": 20.0,
+		"height": 20.0
 	},
 	{
 		"type": "sphere",
-		"radius": 77.0,
-		"color": [0.0, 0.0, 1.0],
-		"position": [1.0, 3.0, 7.0]
+		"radius": 10.0,
+		"color": [0.0, 0.5, .5],
+		"position": [-20.0, -30.0, 50.0]
 	},
 	{
 		"type": "plane",
@@ -18,9 +18,15 @@
 	},
 	{
 		"type": "cylinder",
-		"radius": 2.0,
-		"color": [1.0, 0.0, 1.0],
-		"position": [0, 0, 20]
+		"radius": 5.0,
+		"color": [1.0, 0.0, 0.5],
+		"position": [10, 0, 50]
+	},
+	{
+		"type": "cylinder",
+		"radius": 5.0,
+		"color": [.2, .4, 0.5],
+		"position": [40, 0, 50]
 	}
 
 ]

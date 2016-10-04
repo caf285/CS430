@@ -35,7 +35,7 @@ static inline void normalize(double* v){
 double cylinderIntersection(double* Ro, double* Rd, double* C, double r) {
     /*
      ==> Step 1: Find equation for the object you are interested in (cylinder)
-     x^2 + z*2 = r^2 (z axis makes cylidar up and down)
+     x^2 + z*2 = r^2 (z axis makes cylider up and down)
      
      ==> Step 2: Parameterize the equation with a center point if needed
      (x-Cx)^2 + (z-Cz)^2 = r^
@@ -86,12 +86,25 @@ double cylinderIntersection(double* Ro, double* Rd, double* C, double r) {
     return -1;
 }
 
-double sphereIntersection() {
-    return 0;
+// (Ray Origin, Ray Direction, Center, Radius)
+double sphereIntersection(double* Ro, double* Rd, double* C, double r) {
+    double Rs[] = {Rd[0]-Ro[0], Rd[1]-Ro[1], Rd[2]-Ro[2]};
+    
+    double a = sqr(Rs[0]) + sqr(Rs[1]) + sqr(Rs[2]);
+    double b = 2*Rs[0]*(Ro[0]-C[0]) + 2*Rs[1]*(Ro[1]-C[1]) + 2*Rs[2]*(Ro[2]-C[2]);
+    double c = sqr(C[0]) + sqr(C[1]) + sqr(C[2]) + sqr(Ro[0]) + sqr(Ro[1]) + sqr(Ro[2]) + -2*(C[0]*Ro[0] + C[1]*Ro[1] + C[2]*Ro[2]) - sqr(r);
+    
+    double det = sqr(b) - 4 * a * c;
+    if (det < 0){
+        return -1;
+    } else {
+        return 1;
+    }
 }
 
-double planeIntersection() {
-    return 0;
+// (Ray Origin, Ray Direction, Center, Radius)
+double planeIntersection(double* Ro, double* Rd, double* C, double r) {
+    return -1;
 }
 
 // nextC
@@ -330,7 +343,15 @@ Object** readScene(char* fileName){
     }
 }
 
-void buildScene(Object** objects){
+char* buildHeader(Object** objects, int M, int N){
+    char* header = malloc(sizeof(char)*50);
+    char* headerNode = header;
+    sprintf(headerNode, "P6\n%d\n%d\n255\n", M, N);
+    
+    return header;
+}
+
+unsigned char* buildBuffer(Object** objects, int M, int N){
     
     // camera center
     double cx = 0;
@@ -340,16 +361,21 @@ void buildScene(Object** objects){
     double h = objects[0]->height;
     double w = objects[0]->width;
     
-    // scene width and height
-    int M = 50;
-    int N = 50;
+    // open output file && write header
+    unsigned char* buffer = malloc(sizeof(char)*M*N*10);
+    unsigned char* bufferNode = buffer;
+    
     
     // build scene
     double pixheight = h / M;
     double pixwidth = w / N;
     for (int y = 0; y < M; y += 1) {
         for (int x = 0; x < N; x += 1) {
+            
+            // space for single pixel
+            int color[] = {0, 0, 0};
             double Ro[3] = {0, 0, 0};
+            
             // Rd = normalize(P - Ro)
             double Rd[3] = {
                 cx - (w/2) + pixwidth * (x + 0.5),
@@ -360,20 +386,38 @@ void buildScene(Object** objects){
             
             // paint pixel based on type
             double best_t = INFINITY;
-            for (int i=1; objects[i] != 0; i += 1) {
+            for (int i=1; objects[i] != 0; i ++) {
                 double t = 0;
                 
                 switch(objects[i]->kind) {
                     case 0:
                         break;
                     case 1:
-                        t = cylinderIntersection(Ro, Rd,
-                                                 objects[i]->position,
-                                                 objects[i]->radius);
+                        t = cylinderIntersection(Ro, Rd, objects[i]->position, objects[i]->radius);
+                        if (t > 0 && t < best_t){
+                            color[0] += objects[i]->color[0] * 255;
+                            color[1] += objects[i]->color[1] * 255;
+                            color[2] += objects[i]->color[2] * 255;
+                            t = 0;
+                        }
                         break;
                     case 2:
+                        t = sphereIntersection(Ro, Rd, objects[i]->position, objects[i]->radius);
+                        if (t > 0 && t < best_t){
+                            color[0] += objects[i]->color[0] * 255;
+                            color[1] += objects[i]->color[1] * 255;
+                            color[2] += objects[i]->color[2] * 255;
+                            t = 0;
+                        }
                         break;
                     case 3:
+                        t = planeIntersection(Ro, Rd, objects[i]->position, objects[i]->radius);
+                        if (t > 0 && t < best_t){
+                            color[0] += objects[i]->color[0] * 255;
+                            color[1] += objects[i]->color[1] * 255;
+                            color[2] += objects[i]->color[2] * 255;
+                            t = 0;
+                        }
                         break;
                     default:
                         fprintf(stderr, "Error: Invalid type number: %i", objects[i]->kind);
@@ -381,20 +425,58 @@ void buildScene(Object** objects){
                 }
                 if (t > 0 && t < best_t) best_t = t;
             }
-            if (best_t > 0 && best_t != INFINITY) {
+            for (int i = 0; i < 3; i++){
+                if (color[i] > 255){
+                    color[i] = 255;
+                }
+            }
+            *bufferNode++ = color[0];
+            *bufferNode++ = color[1];
+            *bufferNode++ = color[2];
+            /*if (best_t > 0 && best_t != INFINITY) {
+                *bufferNode++ = color[0];
+                *bufferNode++ = color[1];
+                *bufferNode++ = color[2];
                 printf("#");
             } else {
+                *bufferNode++ = 0;
+                *bufferNode++ = 0;
+                *bufferNode++ = 0;
                 printf(".");
-            }
+            }*/
         }
-        printf("\n");
     }
-    
+    *bufferNode = '\0';
+    return buffer;
 }
 
+void buildFile(char* header, unsigned char* buffer, char* fileName, int M, int N){
+    FILE *FH = fopen(fileName, "w+");
+    char* headerNode = header;
+    unsigned char* bufferNode = buffer;
+    
+    while (*headerNode){
+        fputc(*headerNode++, FH);
+    }
+    
+    for (int i = 0; i < (M * N * 3); i++){
+        fputc(*bufferNode++, FH);
+    }
+    fputc(EOF, FH);
+    fclose(FH);
+}
+
+
 int main(int argc, char* argv[]) {
+
+    // scene width and height
+    int M = 500;
+    int N = 500;
+    
     Object** objects = readScene(argv[1]);
-    buildScene(objects);
+    char* header = buildHeader(objects, M, N);
+    unsigned char* buffer = buildBuffer(objects, M, N);
+    buildFile(header, buffer, argv[2], M, N);
     return 0;
 }
 
