@@ -4,6 +4,8 @@
 #include <string.h>
 #include <math.h>
 
+
+// line for error
 int line = 1;
 
 // allocates large block of memory for structs
@@ -24,6 +26,12 @@ static inline double sqr(double v){
     return v*v;
 }
 
+// dot product
+static inline double dot(double* x, double* y){
+    return x[0] * y[0] + x[1] * y[1] + x[2] * y[2];
+}
+
+// normalize
 static inline void normalize(double* v){
     double len = (sqr(v[0]) + sqr(v[1]) + sqr(v[2]));
     v[0] /= len;
@@ -67,43 +75,70 @@ double cylinderIntersection(double* Ro, double* Rd, double* C, double r) {
      Use quadratic equation to solve for t
      */
     
-    //double a = (Rdx^2 + Rdz^2)
+    // double a = (Rdx^2 + Rdz^2)
     double a = (sqr(Rd[0]) + sqr(Rd[2]));
     double b = (2 * (Ro[0] * Rd[0] - Rd[0] * C[0] + Ro[2] * Rd[2] - Rd[2] * C[2]));
     double c = sqr(Ro[0]) - 2*Ro[0]*C[0] + sqr(C[0]) + sqr(Ro[2]) - 2*Ro[2]*C[2] + sqr(C[2]) - sqr(r);
     
+    // quadratic equation
     double det = sqr(b) - 4 * a * c;
     if (det < 0) return -1;
     
     det = sqrt(det);
     
+    // return lowest t
     double t0 = (-b - det) / (2*a);
-    if (t0 > 0) return t0;
-    
     double t1 = (-b + det) / (2*a);
-    if (t1 > 0) return t1;
-    
+    if (t0 > 0 || t1 > 0){
+        if (t0 < t1) return t0;
+        return t1;
+    }
     return -1;
 }
 
 // (Ray Origin, Ray Direction, Center, Radius)
 double sphereIntersection(double* Ro, double* Rd, double* C, double r) {
-    double Rs[] = {Rd[0]-Ro[0], Rd[1]-Ro[1], Rd[2]-Ro[2]};
     
-    double a = sqr(Rs[0]) + sqr(Rs[1]) + sqr(Rs[2]);
-    double b = 2*Rs[0]*(Ro[0]-C[0]) + 2*Rs[1]*(Ro[1]-C[1]) + 2*Rs[2]*(Ro[2]-C[2]);
-    double c = sqr(C[0]) + sqr(C[1]) + sqr(C[2]) + sqr(Ro[0]) + sqr(Ro[1]) + sqr(Ro[2]) + -2*(C[0]*Ro[0] + C[1]*Ro[1] + C[2]*Ro[2]) - sqr(r);
+    // intersection
+    double a = sqr(Rd[0])+sqr(Rd[1])+sqr(Rd[2]);
+    double b = 2*(Rd[0]*(Ro[0]-C[0])+Rd[1]*(Ro[1]-C[1])+Rd[2]*(Ro[2]-C[2]));
+    double c = sqr(Ro[0]-C[0])+sqr(Ro[1]-C[1])+sqr(Ro[2]-C[2])-sqr(r);
     
+    // determinant
     double det = sqr(b) - 4 * a * c;
-    if (det < 0){
-        return -1;
-    } else {
-        return 1;
+    
+    // quadratic
+    det = sqrt(det);
+    double t0 = (-b - det) / (2*a);
+    double t1 = (-b + det) / (2*a);
+    
+    // return lowest t
+    if (t0 > 0 || t1 > 0){
+        if (t0 < t1) return t0;
+        return t1;
     }
+    return -1;
 }
 
 // (Ray Origin, Ray Direction, Center, Radius)
-double planeIntersection(double* Ro, double* Rd, double* C, double r) {
+double planeIntersection(double* Ro, double* Rd, double* C, double* n) {
+    
+    // set center and origin for dot product
+    double l[] = {C[0]-Ro[0], C[1]-Ro[1], C[2]-Ro[2]};
+    
+    // dot top and bottom
+    double numerator = dot(l, n);
+    double denominator = dot(Rd, n);
+    
+    // error if div by 0
+    if (denominator == 0){
+        fprintf(stderr, "Error: Illegal plane. Cannot divide by zero.\n");
+        exit(1);
+    }
+    
+    // find t and return
+    double t = numerator / denominator;
+    if (t > 0) return t;
     return -1;
 }
 
@@ -283,6 +318,7 @@ Object** readScene(char* fileName){
                     expectC(json, ':');
                     skipWS(json);
                     
+                    // assign all object values
                     if ((strcmp(key, "width") == 0) ||
                         (strcmp(key, "height") == 0) ||
                         (strcmp(key, "radius") == 0)) {
@@ -343,6 +379,7 @@ Object** readScene(char* fileName){
     }
 }
 
+// write P6 header to buffer
 char* buildHeader(Object** objects, int M, int N){
     char* header = malloc(sizeof(char)*50);
     char* headerNode = header;
@@ -351,6 +388,7 @@ char* buildHeader(Object** objects, int M, int N){
     return header;
 }
 
+// build image buffer based on objects
 unsigned char* buildBuffer(Object** objects, int M, int N){
     
     // camera center
@@ -369,11 +407,11 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
     // build scene
     double pixheight = h / M;
     double pixwidth = w / N;
-    for (int y = 0; y < M; y += 1) {
+    for (int y = M; y >0; y -= 1) {
         for (int x = 0; x < N; x += 1) {
             
             // space for single pixel
-            int color[] = {0, 0, 0};
+            int color[3] = {0, 0, 0};
             double Ro[3] = {0, 0, 0};
             
             // Rd = normalize(P - Ro)
@@ -389,67 +427,63 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
             for (int i=1; objects[i] != 0; i ++) {
                 double t = 0;
                 
+                // find closest intersection based on objects
                 switch(objects[i]->kind) {
                     case 0:
                         break;
                     case 1:
                         t = cylinderIntersection(Ro, Rd, objects[i]->position, objects[i]->radius);
                         if (t > 0 && t < best_t){
-                            color[0] += objects[i]->color[0] * 255;
-                            color[1] += objects[i]->color[1] * 255;
-                            color[2] += objects[i]->color[2] * 255;
-                            t = 0;
+                            color[0] = objects[i]->color[0] * 255;
+                            color[1] = objects[i]->color[1] * 255;
+                            color[2] = objects[i]->color[2] * 255;
+                            best_t = t;
                         }
                         break;
                     case 2:
                         t = sphereIntersection(Ro, Rd, objects[i]->position, objects[i]->radius);
                         if (t > 0 && t < best_t){
-                            color[0] += objects[i]->color[0] * 255;
-                            color[1] += objects[i]->color[1] * 255;
-                            color[2] += objects[i]->color[2] * 255;
-                            t = 0;
+                            color[0] = objects[i]->color[0] * 255;
+                            color[1] = objects[i]->color[1] * 255;
+                            color[2] = objects[i]->color[2] * 255;
+                            best_t = t;
                         }
                         break;
                     case 3:
-                        t = planeIntersection(Ro, Rd, objects[i]->position, objects[i]->radius);
+                        t = planeIntersection(Ro, Rd, objects[i]->position, objects[i]->normal);
                         if (t > 0 && t < best_t){
-                            color[0] += objects[i]->color[0] * 255;
-                            color[1] += objects[i]->color[1] * 255;
-                            color[2] += objects[i]->color[2] * 255;
-                            t = 0;
+                            color[0] = objects[i]->color[0] * 255;
+                            color[1] = objects[i]->color[1] * 255;
+                            color[2] = objects[i]->color[2] * 255;
+                            best_t = t;
                         }
                         break;
                     default:
                         fprintf(stderr, "Error: Invalid type number: %i", objects[i]->kind);
                         exit(1);
                 }
-                if (t > 0 && t < best_t) best_t = t;
             }
+            
+            // correct for color value exceeding 255
             for (int i = 0; i < 3; i++){
                 if (color[i] > 255){
                     color[i] = 255;
                 }
             }
+            
+            // write image buffer for RGB
             *bufferNode++ = color[0];
             *bufferNode++ = color[1];
             *bufferNode++ = color[2];
-            /*if (best_t > 0 && best_t != INFINITY) {
-                *bufferNode++ = color[0];
-                *bufferNode++ = color[1];
-                *bufferNode++ = color[2];
-                printf("#");
-            } else {
-                *bufferNode++ = 0;
-                *bufferNode++ = 0;
-                *bufferNode++ = 0;
-                printf(".");
-            }*/
         }
     }
+    
+    // end buffer
     *bufferNode = '\0';
     return buffer;
 }
 
+// open new file and dump image buffer
 void buildFile(char* header, unsigned char* buffer, char* fileName, int M, int N){
     FILE *FH = fopen(fileName, "w+");
     char* headerNode = header;
@@ -466,16 +500,22 @@ void buildFile(char* header, unsigned char* buffer, char* fileName, int M, int N
     fclose(FH);
 }
 
-
 int main(int argc, char* argv[]) {
 
     // scene width and height
     int M = 500;
     int N = 500;
     
+    // read json, and build objects
     Object** objects = readScene(argv[1]);
+    
+    // build header buffer
     char* header = buildHeader(objects, M, N);
+    
+    // build image buffer
     unsigned char* buffer = buildBuffer(objects, M, N);
+    
+    // dump buffer to file
     buildFile(header, buffer, argv[2], M, N);
     return 0;
 }
