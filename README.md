@@ -1,4 +1,14 @@
 # CS430Project2
+Oct 4 2016
+----------
+  + How to use
+    - In terminal type "./main test.json out.ppm" without the quotes
+  
+  + All functionality now present
+    - sphere intersection code fixed so that front of sphere renders rather than back
+    - plane intersection added
+    - full comments
+
 Oct 3 2016
 ----------
   + code now supports the following functionality
