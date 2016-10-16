@@ -18,6 +18,13 @@ typedef struct {
     double radius;
     double position[3];
     double normal[3];
+    double direction[3];
+    double diffuseColor[3];
+    double specularColor[3];
+    double radialA0;
+    double radialA1;
+    double radialA2;
+    double angularA0;
 } Object;
 
 // squared^2 function
@@ -297,6 +304,8 @@ Object** readScene(char* fileName){
                 objects[i]->kind = 2;
             } else if (strcmp(value, "plane") == 0) {
                 objects[i]->kind = 3;
+            } else if (strcmp(value, "light") == 0) {
+                objects[i]->kind = 4;
             } else {
                 fprintf(stderr, "Error: Unknown type, \"%s\", on line number %d.\n", value, line);
                 exit(1);
@@ -321,7 +330,11 @@ Object** readScene(char* fileName){
                     // assign all object values
                     if ((strcmp(key, "width") == 0) ||
                         (strcmp(key, "height") == 0) ||
-                        (strcmp(key, "radius") == 0)) {
+                        (strcmp(key, "radius") == 0) ||
+                        (strcmp(key, "radial-a0") == 0) ||
+                        (strcmp(key, "radial-a1") == 0) ||
+                        (strcmp(key, "radial-a2") == 0) ||
+                        (strcmp(key, "angular-a0") == 0)) {
                         float value = nextNumber(json);
                         if (strcmp(key, "width") == 0){
                             objects[i]->width = value;
@@ -329,10 +342,21 @@ Object** readScene(char* fileName){
                             objects[i]->height = value;
                         } else if (strcmp(key, "radius") == 0){
                             objects[i]->radius = value;
+                        } else if (strcmp(key, "radial-a0") == 0){
+                            objects[i]->radialA0 = value;
+                        } else if (strcmp(key, "radial-a1") == 0){
+                            objects[i]->radialA1 = value;
+                        } else if (strcmp(key, "radial-a2") == 0){
+                            objects[i]->radialA2 = value;
+                        } else if (strcmp(key, "angular-a0") == 0){
+                            objects[i]->angularA0 = value;
                         }
                     } else if ((strcmp(key, "color") == 0) ||
                                (strcmp(key, "position") == 0) ||
-                               (strcmp(key, "normal") == 0)) {
+                               (strcmp(key, "normal") == 0) ||
+                               (strcmp(key, "direction") == 0) ||
+                               (strcmp(key, "diffuse_color") == 0) ||
+                               (strcmp(key, "specular_color") == 0)) {
                         float* value = nextVector(json);
                         if (strcmp(key, "color") == 0){
                             objects[i]->color[0] = value[0];
@@ -346,6 +370,18 @@ Object** readScene(char* fileName){
                             objects[i]->normal[0] = value[0];
                             objects[i]->normal[1] = value[1];
                             objects[i]->normal[2] = value[2];
+                        } else if (strcmp(key, "direction") == 0) {
+                            objects[i]->direction[0] = value[0];
+                            objects[i]->direction[1] = value[1];
+                            objects[i]->direction[2] = value[2];
+                        } else if (strcmp(key, "diffuse_color") == 0) {
+                            objects[i]->diffuseColor[0] = value[0];
+                            objects[i]->diffuseColor[1] = value[1];
+                            objects[i]->diffuseColor[2] = value[2];
+                        } else if (strcmp(key, "specular_color") == 0) {
+                            objects[i]->specularColor[0] = value[0];
+                            objects[i]->specularColor[1] = value[1];
+                            objects[i]->specularColor[2] = value[2];
                         }
                         
                     } else {
@@ -458,6 +494,8 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
                             best_t = t;
                         }
                         break;
+                    case 4:
+                        break;
                     default:
                         fprintf(stderr, "Error: Invalid type number: %i", objects[i]->kind);
                         exit(1);
@@ -503,11 +541,11 @@ void buildFile(char* header, unsigned char* buffer, char* fileName, int M, int N
 int main(int argc, char* argv[]) {
     
     // scene width and height
-    int M = 500;
-    int N = 500;
+    int M = atoi(argv[1]);
+    int N = atoi(argv[2]);
     
     // read json, and build objects
-    Object** objects = readScene(argv[1]);
+    Object** objects = readScene(argv[3]);
     
     // build header buffer
     char* header = buildHeader(objects, M, N);
@@ -516,7 +554,7 @@ int main(int argc, char* argv[]) {
     unsigned char* buffer = buildBuffer(objects, M, N);
     
     // dump buffer to file
-    buildFile(header, buffer, argv[2], M, N);
+    buildFile(header, buffer, argv[4], M, N);
     return 0;
 }
 
