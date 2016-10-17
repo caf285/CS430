@@ -427,6 +427,32 @@ char* buildHeader(Object** objects, int M, int N){
 // build image buffer based on objects
 unsigned char* buildBuffer(Object** objects, int M, int N){
     
+    // build lights objects
+    Object** lights = malloc(sizeof(Object*)*128);
+    int lightCount = 0;
+    for (int i=1; objects[i] != 0; i ++) {
+        switch(objects[i]->kind) {
+            case 0:
+                break;
+            case 1:
+                break;
+            case 2:
+                break;
+            case 3:
+                break;
+            case 4:
+                lights[lightCount] = objects[i];
+                lightCount++;
+                break;
+            default:
+                break;
+        }
+    }
+    if (lightCount == 0){
+        fprintf(stderr, "Error: No lights were found in scene");
+        exit(1);
+    }
+    
     // camera center
     double cx = 0;
     double cy = 0;
@@ -447,7 +473,7 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
         for (int x = 0; x < N; x += 1) {
             
             // space for single pixel
-            int color[3] = {0, 0, 0};
+            //int color[3] = {0, 0, 0};
             double Ro[3] = {0, 0, 0};
             
             // Rd = normalize(P - Ro)
@@ -459,7 +485,9 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
             normalize(Rd);
             
             // paint pixel based on type
-            double best_t = INFINITY;
+            double closestT = INFINITY;
+            Object* closestObject = NULL;
+            
             for (int i=1; objects[i] != 0; i ++) {
                 double t = 0;
                 
@@ -469,29 +497,29 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
                         break;
                     case 1:
                         t = cylinderIntersection(Ro, Rd, objects[i]->position, objects[i]->radius);
-                        if (t > 0 && t < best_t){
-                            color[0] = objects[i]->color[0] * 255;
-                            color[1] = objects[i]->color[1] * 255;
-                            color[2] = objects[i]->color[2] * 255;
-                            best_t = t;
+                        if (t > 0 && t < closestT){
+                            //color[0] = objects[i]->color[0] * 255;
+                            //color[1] = objects[i]->color[1] * 255;
+                            //color[2] = objects[i]->color[2] * 255;
+                            closestT = t;
                         }
                         break;
                     case 2:
                         t = sphereIntersection(Ro, Rd, objects[i]->position, objects[i]->radius);
-                        if (t > 0 && t < best_t){
-                            color[0] = objects[i]->color[0] * 255;
-                            color[1] = objects[i]->color[1] * 255;
-                            color[2] = objects[i]->color[2] * 255;
-                            best_t = t;
+                        if (t > 0 && t < closestT){
+                            //color[0] = objects[i]->color[0] * 255;
+                            //color[1] = objects[i]->color[1] * 255;
+                            //color[2] = objects[i]->color[2] * 255;
+                            closestT = t;
                         }
                         break;
                     case 3:
                         t = planeIntersection(Ro, Rd, objects[i]->position, objects[i]->normal);
-                        if (t > 0 && t < best_t){
-                            color[0] = objects[i]->color[0] * 255;
-                            color[1] = objects[i]->color[1] * 255;
-                            color[2] = objects[i]->color[2] * 255;
-                            best_t = t;
+                        if (t > 0 && t < closestT){
+                            //color[0] = objects[i]->color[0] * 255;
+                            //color[1] = objects[i]->color[1] * 255;
+                            //color[2] = objects[i]->color[2] * 255;
+                            closestT = t;
                         }
                         break;
                     case 4:
@@ -499,10 +527,24 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
                     default:
                         fprintf(stderr, "Error: Invalid type number: %i", objects[i]->kind);
                         exit(1);
+                        break;
+                }
+                
+                // create color list
+                double* color = malloc(sizeof(double)*3);
+                color[0] = 0; // ambient_color[0];
+                color[1] = 0; // ambient_color[1];
+                color[2] = 0; // ambient_color[2];
+
+                // discover lights
+                for (int j = 0; lights[j] !=NULL; j++){
+                    
                 }
             }
             
-            // correct for color value exceeding 255
+            
+            
+            /* correct for color value exceeding 255
             for (int i = 0; i < 3; i++){
                 if (color[i] > 255){
                     color[i] = 255;
@@ -512,7 +554,7 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
             // write image buffer for RGB
             *bufferNode++ = color[0];
             *bufferNode++ = color[1];
-            *bufferNode++ = color[2];
+            *bufferNode++ = color[2];*/
         }
     }
     
@@ -557,17 +599,3 @@ int main(int argc, char* argv[]) {
     buildFile(header, buffer, argv[4], M, N);
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
