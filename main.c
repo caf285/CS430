@@ -25,7 +25,18 @@ typedef struct {
     double radialA1;
     double radialA2;
     double angularA0;
+    double theta;
 } Object;
+
+static inline double clamp (double color) {
+    if (color < 0) {
+        return 0;
+    } else if (color > 1) {
+        return 1;
+    } else {
+        return color;
+    }
+}
 
 // squared^2 function
 // make static for consistent behavior
@@ -33,9 +44,21 @@ static inline double sqr(double v){
     return v*v;
 }
 
+static inline double exponent(double x, double y){
+    for (int i = 1; i < y; i++){
+        x *= x;
+    }
+    return x;
+}
+
 // dot product
 static inline double dot(double* x, double* y){
     return x[0] * y[0] + x[1] * y[1] + x[2] * y[2];
+}
+
+// distance
+static inline double dist(double* x, double* y){
+    return sqrt(sqr(y[0]-x[0])+sqr(y[1]-x[1])+sqr(y[2]-x[2]));
 }
 
 // normalize
@@ -47,7 +70,7 @@ static inline void normalize(double* v){
 }
 
 // (Ray Origin, Ray Direction, Center, Radius)
-double cylinderIntersection(double* Ro, double* Rd, double* C, double r) {
+static inline double cylinderIntersection(double* Ro, double* Rd, double* C, double r) {
     /*
      ==> Step 1: Find equation for the object you are interested in (cylinder)
      x^2 + z*2 = r^2 (z axis makes cylider up and down)
@@ -104,7 +127,7 @@ double cylinderIntersection(double* Ro, double* Rd, double* C, double r) {
 }
 
 // (Ray Origin, Ray Direction, Center, Radius)
-double sphereIntersection(double* Ro, double* Rd, double* C, double r) {
+static inline double sphereIntersection(double* Ro, double* Rd, double* C, double r) {
     
     // intersection
     double a = sqr(Rd[0])+sqr(Rd[1])+sqr(Rd[2]);
@@ -128,7 +151,7 @@ double sphereIntersection(double* Ro, double* Rd, double* C, double r) {
 }
 
 // (Ray Origin, Ray Direction, Center, Radius)
-double planeIntersection(double* Ro, double* Rd, double* C, double* n) {
+static inline double planeIntersection(double* Ro, double* Rd, double* C, double* n) {
     
     // set center and origin for dot product
     double l[] = {C[0]-Ro[0], C[1]-Ro[1], C[2]-Ro[2]};
@@ -147,6 +170,20 @@ double planeIntersection(double* Ro, double* Rd, double* C, double* n) {
     double t = numerator / denominator;
     if (t > 0) return t;
     return -1;
+}
+
+// frad function
+double frad(double a2, double a1, double a0, double dist){
+    double denominator = a2*dist+a1*dist*a0;
+    if (denominator == 0){
+        fprintf(stderr, "Error: Cannot divide by zero.\n");
+        exit(1);
+    }
+    return 1/denominator;
+}
+
+double fang(){
+    return .1;
 }
 
 // nextC
@@ -334,7 +371,8 @@ Object** readScene(char* fileName){
                         (strcmp(key, "radial-a0") == 0) ||
                         (strcmp(key, "radial-a1") == 0) ||
                         (strcmp(key, "radial-a2") == 0) ||
-                        (strcmp(key, "angular-a0") == 0)) {
+                        (strcmp(key, "angular-a0") == 0) ||
+                        (strcmp(key, "theta") == 0)) {
                         float value = nextNumber(json);
                         if (strcmp(key, "width") == 0){
                             objects[i]->width = value;
@@ -350,6 +388,8 @@ Object** readScene(char* fileName){
                             objects[i]->radialA2 = value;
                         } else if (strcmp(key, "angular-a0") == 0){
                             objects[i]->angularA0 = value;
+                        } else if (strcmp(key, "theta") == 0){
+                            objects[i]->theta = value;
                         }
                     } else if ((strcmp(key, "color") == 0) ||
                                (strcmp(key, "position") == 0) ||
@@ -465,6 +505,9 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
     unsigned char* buffer = malloc(sizeof(char)*M*N*10);
     unsigned char* bufferNode = buffer;
     
+    // space for single pixel
+    double* Ro = malloc(sizeof(double)*3);
+    double* Rd = malloc(sizeof(double)*3);
     
     // build scene
     double pixheight = h / M;
@@ -473,20 +516,26 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
         for (int x = 0; x < N; x += 1) {
             
             // space for single pixel
-            //int color[3] = {0, 0, 0};
-            double Ro[3] = {0, 0, 0};
+            Ro[0] = 0;
+            Ro[1] = 0;
+            Ro[2] = 0;
             
             // Rd = normalize(P - Ro)
-            double Rd[3] = {
-                cx - (w/2) + pixwidth * (x + 0.5),
-                cy - (h/2) + pixheight * (y + 0.5),
-                1
-            };
+            Rd[0] = cx - (w/2) + pixwidth * (x + 0.5);
+            Rd[1] = cy - (h/2) + pixheight * (y + 0.5);
+            Rd[2] = 1;
+            
             normalize(Rd);
             
             // paint pixel based on type
             double closestT = INFINITY;
             Object* closestObject = NULL;
+            
+            // create color list
+            double* color = malloc(sizeof(double)*3);
+            color[0] = 0; // ambient_color[0];
+            color[1] = 0; // ambient_color[1];
+            color[2] = 0; // ambient_color[2];
             
             for (int i=1; objects[i] != 0; i ++) {
                 double t = 0;
@@ -498,28 +547,23 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
                     case 1:
                         t = cylinderIntersection(Ro, Rd, objects[i]->position, objects[i]->radius);
                         if (t > 0 && t < closestT){
-                            //color[0] = objects[i]->color[0] * 255;
-                            //color[1] = objects[i]->color[1] * 255;
-                            //color[2] = objects[i]->color[2] * 255;
                             closestT = t;
+                            closestObject = objects[i];
                         }
                         break;
                     case 2:
                         t = sphereIntersection(Ro, Rd, objects[i]->position, objects[i]->radius);
                         if (t > 0 && t < closestT){
-                            //color[0] = objects[i]->color[0] * 255;
-                            //color[1] = objects[i]->color[1] * 255;
-                            //color[2] = objects[i]->color[2] * 255;
                             closestT = t;
+                            closestObject = objects[i];
+
                         }
                         break;
                     case 3:
                         t = planeIntersection(Ro, Rd, objects[i]->position, objects[i]->normal);
                         if (t > 0 && t < closestT){
-                            //color[0] = objects[i]->color[0] * 255;
-                            //color[1] = objects[i]->color[1] * 255;
-                            //color[2] = objects[i]->color[2] * 255;
                             closestT = t;
+                            closestObject = objects[i];
                         }
                         break;
                     case 4:
@@ -529,32 +573,154 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
                         exit(1);
                         break;
                 }
-                
-                // create color list
-                double* color = malloc(sizeof(double)*3);
-                color[0] = 0; // ambient_color[0];
-                color[1] = 0; // ambient_color[1];
-                color[2] = 0; // ambient_color[2];
-
+            }
+            
+            
+            if (closestT < INFINITY){
                 // discover lights
                 for (int j = 0; lights[j] !=NULL; j++){
                     
+                    // new origin
+                    double* Ron = malloc(sizeof(double)*3);
+                    Ron[0] = closestT * Rd[0] + Ro[0];
+                    Ron[1] = closestT * Rd[1] + Ro[1];
+                    Ron[2] = closestT * Rd[2] + Ro[2];
+                    
+                    // new direction
+                    double* Rdn = malloc(sizeof(double)*3);
+                    Rdn[0] = lights[j]->position[0] - Ron[0];
+                    Rdn[1] = lights[j]->position[1] - Ron[1];
+                    Rdn[2] = lights[j]->position[2] - Ron[2];
+                    
+                    double closestT = INFINITY;
+                    Object* closestShadowObject = NULL;
+                    
+                    for (int k = 0; objects[k] != NULL; k++){
+                        
+                        if (objects[k] == closestObject){
+                            continue;
+                        }
+                        double t = 0;
+                        
+                        
+                        // object->intersect()
+                        switch(objects[k]->kind){
+                            case 0:
+                                break;
+                            case 1:
+                                t = cylinderIntersection(Ron, Rdn, objects[k]->position, objects[k]->radius);
+                                if (t > 0 && t < closestT){
+                                    closestT = t;
+                                    
+                                }
+                                break;
+                            case 2:
+                                t = sphereIntersection(Ron, Rdn, objects[k]->position, objects[k]->radius);
+                                if (t > 0 && t < closestT){
+                                    closestT = t;
+                                }
+                                break;
+                            case 3:
+                                t = planeIntersection(Ron, Rdn, objects[k]->position, objects[k]->normal);
+                                if (t > 0 && t < closestT){
+                                    closestT = t;
+                                }
+                                break;
+                            case 4:
+                                break;
+                            default:
+                                fprintf(stderr, "Error: Invalid type number: %i", objects[k]->kind);
+                                exit(1);
+                                break;
+                        
+                        }
+                        
+                        if (closestT < INFINITY && closestT < dist(Ron, lights[j]->position)){
+                            closestShadowObject = objects[k];
+                        } else {
+                            continue;
+                        }
+                        
+                        
+                    }
+                    
+                    if (closestShadowObject == NULL) {
+                        // N, L, R, V
+                        // shinyness
+                        double NS = 50;
+                        
+                        // N
+                        double* N = malloc(sizeof(double)*3);
+                        switch(closestObject->kind){
+                            case 2: // sphere
+                                N[0] = Ron[0] - closestObject->position[0];
+                                N[1] = Ron[1] - closestObject->position[1];
+                                N[2] = Ron[2] - closestObject->position[2];
+                                break;
+                            case 3: // plane
+                                N = closestObject->normal;
+                                break;
+                            default:
+                                break;
+                        }
+                        
+                        // L
+                        double* L = malloc(sizeof(double)*3);
+                        L = Rdn; // light_position - Ron;
+                        
+                        
+                        // R = reflection of L
+                        double* R = malloc(sizeof(double)*3);
+                        
+                        R[0] = 2 * N[0] * dot(N, L) - L[0];
+                        R[1] = 2 * N[1] * dot(N, L) - L[1];
+                        R[2] = 2 * N[2] * dot(N, L) - L[2];
+
+                        // V = Rd;
+                        double* V = malloc(sizeof(double)*3);
+                        V[0] = -1 * Rd[0];
+                        V[1] = -1 * Rd[1];
+                        V[2] = -1 * Rd[2];
+                        
+                        // diffuse
+                        double* diffuse = malloc(sizeof(double)*3);
+                        if (dot(N, L) > 0){
+                            diffuse[0] = closestObject->diffuseColor[0] * lights[j]->color[0] * dot(N, L);
+                            diffuse[1] = closestObject->diffuseColor[1] * lights[j]->color[0] * dot(N, L);
+                            diffuse[2] = closestObject->diffuseColor[2] * lights[j]->color[0] * dot(N, L);
+                        } else {
+                            diffuse[0] = 0;
+                            diffuse[1] = 0;
+                            diffuse[2] = 0;
+                        }
+                        
+                        // specular
+                        double* specular = malloc(sizeof(double)*3);
+                        if (dot(V, R) > 0 && dot(N, L) > 0){
+                            specular[0] = closestObject->specularColor[0] * lights[j]->color[0] * exponent(dot(R, V), NS); // uses object's specular color
+                            specular[1] = closestObject->specularColor[1] * lights[j]->color[1] * exponent(dot(R, V), NS);
+                            specular[2] = closestObject->specularColor[2] * lights[j]->color[2] * exponent(dot(R, V), NS);
+                        } else {
+                            specular[0] = 0; // uses object's specular color
+                            specular[1] = 0;
+                            specular[2] = 0;
+
+                        }
+                        
+                        color[0] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang() * (diffuse[0] + specular[0]);
+                        color[1] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang() * (diffuse[1] + specular[1]);
+                        color[2] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang() * (diffuse[2] + specular[2]);
+                    } else {
+                        color[0] =0;
+                        color[1] =0;
+                        color[2] =0;
+                    }
                 }
             }
             
-            
-            
-            /* correct for color value exceeding 255
-            for (int i = 0; i < 3; i++){
-                if (color[i] > 255){
-                    color[i] = 255;
-                }
-            }
-            
-            // write image buffer for RGB
-            *bufferNode++ = color[0];
-            *bufferNode++ = color[1];
-            *bufferNode++ = color[2];*/
+            *bufferNode++ = (255 * clamp(color[0]));
+            *bufferNode++ = (255 * clamp(color[1]));
+            *bufferNode++ = (255 * clamp(color[2]));
         }
     }
     
@@ -599,3 +765,17 @@ int main(int argc, char* argv[]) {
     buildFile(header, buffer, argv[4], M, N);
     return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
