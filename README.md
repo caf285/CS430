@@ -1,6 +1,21 @@
 # CS430Project3
 Illumination
 
+Oct 20, 2016
+------------
++ How to use
+  - Format includes name of program, followed by X size, Y Size, json file name, ppm file name
+  - For example "./main 500 500 test.json out.ppm"
+
++ Additions
+  - Angular Attenuation is now functional
+  - Point Lights are now supported ... I hope
+  - Specular color is now a reasonable size
+  - Memory allocation bug has been fixed
+
++ Extra Stuff
+  - Shadows only remove 50% of color instead of all color.
+  
 Oct 19, 2016
 ------------
 
