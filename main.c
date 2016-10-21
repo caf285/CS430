@@ -4,7 +4,6 @@
 #include <string.h>
 #include <math.h>
 
-
 // line for error
 int line = 1;
 
@@ -28,6 +27,8 @@ typedef struct {
     double theta;
 } Object;
 
+// clamp
+// returns value between 0 and 1
 static inline double clamp (double color) {
     if (color < 0) {
         return 0;
@@ -44,6 +45,8 @@ static inline double sqr(double v){
     return v*v;
 }
 
+// exponent
+// returns value x multiplied by itself by value y times
 static inline double exponent(double x, double y){
     for (int i = 1; i < y; i++){
         x *= x;
@@ -63,7 +66,7 @@ static inline double dist(double* x, double* y){
 
 // normalize
 static inline void normalize(double* v){
-    double len = (sqr(v[0]) + sqr(v[1]) + sqr(v[2]));
+    double len = sqrt(sqr(v[0]) + sqr(v[1]) + sqr(v[2]));
     v[0] /= len;
     v[1] /= len;
     v[2] /= len;
@@ -174,7 +177,7 @@ static inline double planeIntersection(double* Ro, double* Rd, double* C, double
 
 // frad function
 double frad(double a2, double a1, double a0, double dist){
-    double denominator = a2*dist+a1*dist*a0;
+    double denominator = a2*dist+a1*dist+a0;
     if (denominator == 0){
         fprintf(stderr, "Error: Cannot divide by zero.\n");
         exit(1);
@@ -182,8 +185,13 @@ double frad(double a2, double a1, double a0, double dist){
     return 1/denominator;
 }
 
-double fang(){
-    return .1;
+// fang function
+double fang(double theta, double* lightDirection, double* Ron, double angularA0){
+    theta = theta * (M_PI / 180);
+    double cosTheta = cos(theta);
+    double cosAlpha = dot(lightDirection, Ron);
+    if (cosAlpha < cosTheta) return 0.0;
+    return exponent(cosAlpha, angularA0);
 }
 
 // nextC
@@ -289,8 +297,7 @@ float* nextVector(FILE* json){
 
 // readScene (open and parse json file)
 Object** readScene(char* fileName){
-    Object** objects;
-    objects = malloc(sizeof(Object*)*128);
+    Object** objects = malloc(sizeof(Object)*256);
     
     int c;
     FILE* json = fopen(fileName, "r");
@@ -376,6 +383,7 @@ Object** readScene(char* fileName){
                         float value = nextNumber(json);
                         if (strcmp(key, "width") == 0){
                             objects[i]->width = value;
+                            
                         } else if (strcmp(key, "height") == 0){
                             objects[i]->height = value;
                         } else if (strcmp(key, "radius") == 0){
@@ -397,6 +405,7 @@ Object** readScene(char* fileName){
                                (strcmp(key, "direction") == 0) ||
                                (strcmp(key, "diffuse_color") == 0) ||
                                (strcmp(key, "specular_color") == 0)) {
+                        
                         float* value = nextVector(json);
                         if (strcmp(key, "color") == 0){
                             objects[i]->color[0] = value[0];
@@ -468,7 +477,7 @@ char* buildHeader(Object** objects, int M, int N){
 unsigned char* buildBuffer(Object** objects, int M, int N){
     
     // build lights objects
-    Object** lights = malloc(sizeof(Object*)*128);
+    Object** lights = malloc(sizeof(Object)*128);
     int lightCount = 0;
     for (int i=1; objects[i] != 0; i ++) {
         switch(objects[i]->kind) {
@@ -524,7 +533,6 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
             Rd[0] = cx - (w/2) + pixwidth * (x + 0.5);
             Rd[1] = cy - (h/2) + pixheight * (y + 0.5);
             Rd[2] = 1;
-            
             normalize(Rd);
             
             // paint pixel based on type
@@ -574,7 +582,6 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
                         break;
                 }
             }
-            
             
             if (closestT < INFINITY){
                 // discover lights
@@ -647,7 +654,7 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
                     if (closestShadowObject == NULL) {
                         // N, L, R, V
                         // shinyness
-                        double NS = 50;
+                        double NS = 7;
                         
                         // N
                         double* N = malloc(sizeof(double)*3);
@@ -656,9 +663,11 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
                                 N[0] = Ron[0] - closestObject->position[0];
                                 N[1] = Ron[1] - closestObject->position[1];
                                 N[2] = Ron[2] - closestObject->position[2];
+                                normalize(N);
                                 break;
                             case 3: // plane
                                 N = closestObject->normal;
+                                normalize(N);
                                 break;
                             default:
                                 break;
@@ -667,7 +676,7 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
                         // L
                         double* L = malloc(sizeof(double)*3);
                         L = Rdn; // light_position - Ron;
-                        
+                        normalize(L);
                         
                         // R = reflection of L
                         double* R = malloc(sizeof(double)*3);
@@ -675,7 +684,7 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
                         R[0] = 2 * N[0] * dot(N, L) - L[0];
                         R[1] = 2 * N[1] * dot(N, L) - L[1];
                         R[2] = 2 * N[2] * dot(N, L) - L[2];
-
+                        
                         // V = Rd;
                         double* V = malloc(sizeof(double)*3);
                         V[0] = -1 * Rd[0];
@@ -696,24 +705,33 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
                         
                         // specular
                         double* specular = malloc(sizeof(double)*3);
+                        specular[0] = 0; // uses object's specular color
+                        specular[1] = 0;
+                        specular[2] = 0;
                         if (dot(V, R) > 0 && dot(N, L) > 0){
                             specular[0] = closestObject->specularColor[0] * lights[j]->color[0] * exponent(dot(R, V), NS); // uses object's specular color
                             specular[1] = closestObject->specularColor[1] * lights[j]->color[1] * exponent(dot(R, V), NS);
                             specular[2] = closestObject->specularColor[2] * lights[j]->color[2] * exponent(dot(R, V), NS);
-                        } else {
+                            } else {
                             specular[0] = 0; // uses object's specular color
                             specular[1] = 0;
                             specular[2] = 0;
 
                         }
+                        if (lights[j]->direction[0] == 0 && lights[j]->direction[1] == 0 && lights[j]->direction[2] == 0){
+                            color[0] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * (diffuse[0] + specular[0]);
+                            color[1] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * (diffuse[1] + specular[1]);
+                            color[2] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * (diffuse[2] + specular[2]);
+                        } else {
+                            color[0] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang(lights[j]->theta, lights[j]->direction, Ron, lights[j]->angularA0) * (diffuse[0] + specular[0]);
+                            color[1] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang(lights[j]->theta, lights[j]->direction, Ron, lights[j]->angularA0) * (diffuse[1] + specular[1]);
+                            color[2] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang(lights[j]->theta, lights[j]->direction, Ron, lights[j]->angularA0) * (diffuse[2] + specular[2]);
+                        }
                         
-                        color[0] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang() * (diffuse[0] + specular[0]);
-                        color[1] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang() * (diffuse[1] + specular[1]);
-                        color[2] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang() * (diffuse[2] + specular[2]);
                     } else {
-                        color[0] =0;
-                        color[1] =0;
-                        color[2] =0;
+                        color[0] /=5;
+                        color[1] /=5;
+                        color[2] /=5;
                     }
                 }
             }
@@ -765,17 +783,3 @@ int main(int argc, char* argv[]) {
     buildFile(header, buffer, argv[4], M, N);
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
