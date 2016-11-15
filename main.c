@@ -108,7 +108,7 @@ double* buildColor(Object** objects, Object** lights, double* color, double* Ro,
             Rdn[2] = lights[j]->position[2] - Ron[2];
             
             
-
+            
             double closestT = INFINITY;
             Object* closestShadowObject = NULL;
             
@@ -160,110 +160,107 @@ double* buildColor(Object** objects, Object** lights, double* color, double* Ro,
                 }
             }
             
-            // adjust new origin to be slightly off of the current surface
-            Ron[0] = 0.01 * Rdm[0];
-            Ron[1] = 0.01 * Rdm[1];
-            Ron[2] = 0.01 * Rdm[2];
-            
             // ================================================================(if no shadow)
-            if (closestShadowObject == NULL) {
-                
-                // N, L, R, V
-                // shinyness
-                double NS = 7;
-                
-                // N
-                double* N = malloc(sizeof(double)*3);
-                switch(closestObject->kind){
-                    case 2: // sphere
-                        N[0] = Ron[0] - closestObject->position[0];
-                        N[1] = Ron[1] - closestObject->position[1];
-                        N[2] = Ron[2] - closestObject->position[2];
-                        normalize(N);
-                        break;
-                    case 3: // plane
-                        N = closestObject->normal;
-                        normalize(N);
-                        break;
-                    default:
-                        break;
-                }
-                
-                // L
-                double* L = malloc(sizeof(double)*3);
-                L = Rdn; // light_position - Ron;
-                normalize(L);
-                
-                // R = reflection of L
-                double* R = malloc(sizeof(double)*3);
-                
-                R[0] = 2 * N[0] * dot(N, L) - L[0];
-                R[1] = 2 * N[1] * dot(N, L) - L[1];
-                R[2] = 2 * N[2] * dot(N, L) - L[2];
-                
-                // V = Rd;
-                double* V = malloc(sizeof(double)*3);
-                V[0] = -1 * Rd[0];
-                V[1] = -1 * Rd[1];
-                V[2] = -1 * Rd[2];
-                
-                // diffuse
-                double* diffuse = malloc(sizeof(double)*3);
-                if (dot(N, L) > 0){
-                    diffuse[0] = closestObject->diffuseColor[0] * lights[j]->color[0] * dot(N, L);
-                    diffuse[1] = closestObject->diffuseColor[1] * lights[j]->color[0] * dot(N, L);
-                    diffuse[2] = closestObject->diffuseColor[2] * lights[j]->color[0] * dot(N, L);
-                } else {
-                    diffuse[0] = 0;
-                    diffuse[1] = 0;
-                    diffuse[2] = 0;
-                }
-                
-                // specular
-                double* specular = malloc(sizeof(double)*3);
+            
+            // N, L, R, V
+            // shinyness
+            double NS = 7;
+            
+            // N
+            double* N = malloc(sizeof(double)*3);
+            switch(closestObject->kind){
+                case 2: // sphere
+                    N[0] = Ron[0] - closestObject->position[0];
+                    N[1] = Ron[1] - closestObject->position[1];
+                    N[2] = Ron[2] - closestObject->position[2];
+                    normalize(N);
+                    break;
+                case 3: // plane
+                    N = closestObject->normal;
+                    normalize(N);
+                    break;
+                default:
+                    break;
+            }
+            
+            // L
+            double* L = malloc(sizeof(double)*3);
+            L = Rdn; // light_position - Ron;
+            normalize(L);
+            
+            // R = reflection of L
+            double* R = malloc(sizeof(double)*3);
+            
+            R[0] = 2 * N[0] * dot(N, L) - L[0];
+            R[1] = 2 * N[1] * dot(N, L) - L[1];
+            R[2] = 2 * N[2] * dot(N, L) - L[2];
+            
+            // V = Rd;
+            double* V = malloc(sizeof(double)*3);
+            V[0] = -1 * Rd[0];
+            V[1] = -1 * Rd[1];
+            V[2] = -1 * Rd[2];
+            
+            // diffuse
+            double* diffuse = malloc(sizeof(double)*3);
+            if (dot(N, L) > 0){
+                diffuse[0] = closestObject->diffuseColor[0] * lights[j]->color[0] * dot(N, L);
+                diffuse[1] = closestObject->diffuseColor[1] * lights[j]->color[0] * dot(N, L);
+                diffuse[2] = closestObject->diffuseColor[2] * lights[j]->color[0] * dot(N, L);
+            } else {
+                diffuse[0] = 0;
+                diffuse[1] = 0;
+                diffuse[2] = 0;
+            }
+            
+            // specular
+            double* specular = malloc(sizeof(double)*3);
+            specular[0] = 0; // uses object's specular color
+            specular[1] = 0;
+            specular[2] = 0;
+            if (dot(V, R) > 0 && dot(N, L) > 0){
+                specular[0] = closestObject->specularColor[0] * lights[j]->color[0] * exponent(dot(R, V), NS); // uses object's specular color
+                specular[1] = closestObject->specularColor[1] * lights[j]->color[1] * exponent(dot(R, V), NS);
+                specular[2] = closestObject->specularColor[2] * lights[j]->color[2] * exponent(dot(R, V), NS);
+            } else {
                 specular[0] = 0; // uses object's specular color
                 specular[1] = 0;
                 specular[2] = 0;
-                if (dot(V, R) > 0 && dot(N, L) > 0){
-                    specular[0] = closestObject->specularColor[0] * lights[j]->color[0] * exponent(dot(R, V), NS); // uses object's specular color
-                    specular[1] = closestObject->specularColor[1] * lights[j]->color[1] * exponent(dot(R, V), NS);
-                    specular[2] = closestObject->specularColor[2] * lights[j]->color[2] * exponent(dot(R, V), NS);
-                } else {
-                    specular[0] = 0; // uses object's specular color
-                    specular[1] = 0;
-                    specular[2] = 0;
-                    
-                }
-                if (lights[j]->direction[0] == 0 && lights[j]->direction[1] == 0 && lights[j]->direction[2] == 0){
-                    color[0] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * (diffuse[0] + specular[0]);
-                    color[1] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * (diffuse[1] + specular[1]);
-                    color[2] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * (diffuse[2] + specular[2]);
-                } else {
-                    color[0] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang(lights[j]->theta, lights[j]->direction, Ron, lights[j]->angularA0) * (diffuse[0] + specular[0]);
-                    color[1] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang(lights[j]->theta, lights[j]->direction, Ron, lights[j]->angularA0) * (diffuse[1] + specular[1]);
-                    color[2] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang(lights[j]->theta, lights[j]->direction, Ron, lights[j]->angularA0) * (diffuse[2] + specular[2]);
-                }
                 
-                if (closestObject->reflectivity == 0) {
-                    return color;
-                } else {
-                    reflectColor = buildColor(objects, lights, reflectColor, Ron, Rdm, depth - 1);
-                    
-                    color[0] = ((1 - closestObject->reflectivity) * color[0]) + (closestObject->reflectivity * reflectColor[0]);
-                    color[1] = ((1 - closestObject->reflectivity) * color[1]) + (closestObject->reflectivity * reflectColor[1]);
-                    color[2] = ((1 - closestObject->reflectivity) * color[2]) + (closestObject->reflectivity * reflectColor[2]);
-                }
-                // ================================================================(if shadow)
+            }
+            if (lights[j]->direction[0] == 0 && lights[j]->direction[1] == 0 && lights[j]->direction[2] == 0){
+                color[0] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * (diffuse[0] + specular[0]);
+                color[1] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * (diffuse[1] + specular[1]);
+                color[2] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * (diffuse[2] + specular[2]);
             } else {
-                if (closestObject->reflectivity == 0) {
-                    return color;
-                } else {
-                    reflectColor = buildColor(objects, lights, reflectColor, Ron, Rdm, depth - 1);
-                    
-                    color[0] = (((1 - closestObject->reflectivity) * color[0]) + (closestObject->reflectivity * reflectColor[0])) /20;
-                    color[1] = (((1 - closestObject->reflectivity) * color[1]) + (closestObject->reflectivity * reflectColor[1])) /20;
-                    color[2] = (((1 - closestObject->reflectivity) * color[2]) + (closestObject->reflectivity * reflectColor[2])) /20;
-                }
+                color[0] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang(lights[j]->theta, lights[j]->direction, Ron, lights[j]->angularA0) * (diffuse[0] + specular[0]);
+                color[1] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang(lights[j]->theta, lights[j]->direction, Ron, lights[j]->angularA0) * (diffuse[1] + specular[1]);
+                color[2] += frad(lights[j]->radialA2, lights[j]->radialA1, lights[j]->radialA0, dist(Ron, lights[j]->position)) * fang(lights[j]->theta, lights[j]->direction, Ron, lights[j]->angularA0) * (diffuse[2] + specular[2]);
+            }
+            
+            if (closestObject->reflectivity == 0) {
+                return color;
+            } else {
+                
+                // pull reflection off of surface by just a bit (reduces specs)
+                Ron[0] = Ron[0] + 0.01 * normal[0];
+                Ron[1] = Ron[1] + 0.01 * normal[1];
+                Ron[2] = Ron[2] + 0.01 * normal[2];
+                
+                // recursion call
+                reflectColor = buildColor(objects, lights, reflectColor, Ron, Rdm, depth - 1);
+                
+                color[0] = ((1 - closestObject->reflectivity) * color[0]) + (closestObject->reflectivity * reflectColor[0]);
+                color[1] = ((1 - closestObject->reflectivity) * color[1]) + (closestObject->reflectivity * reflectColor[1]);
+                color[2] = ((1 - closestObject->reflectivity) * color[2]) + (closestObject->reflectivity * reflectColor[2]);
+            }
+                // ================================================================(if shadow)
+            if (closestShadowObject != NULL){
+                color[0] /= 3;
+                color[1] /= 3;
+                color[2] /= 3;
+                
+                
             }
             
             
@@ -346,7 +343,7 @@ unsigned char* buildBuffer(Object** objects, int M, int N){
             
             // build color for each level
             color = buildColor(objects, lights, color, Ro, Rd, 7);
-        
+            
             *bufferNode++ = (255 * clamp(color[0]));
             *bufferNode++ = (255 * clamp(color[1]));
             *bufferNode++ = (255 * clamp(color[2]));
