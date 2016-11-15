@@ -3,6 +3,12 @@ CS430Project4
 
 16-11-13
 -----
++ Update
+    - Reflection now properly reflects surfaces by passing a reflected vector into the recursion call, rather than passing in the normal vector
+    - previous relfection would create an infinite mirror effect, rather than proper reflection
+
+16-11-13
+-----
 + Project Requirements
     - Calulate refraction for each level
     
