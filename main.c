@@ -66,25 +66,30 @@ double* buildColor(Object** objects, Object** lights, double* color, double* Ro,
         Ron[2] = closestT * Rd[2] + Ro[2];
         
         // new normal
-        double* Rdm = malloc(sizeof(double)*3);
-        Rdm[0] = 0;
-        Rdm[1] = 0;
-        Rdm[2] = 0;
+        double* normal = malloc(sizeof(double)*3);
+        normal[0] = 0;
+        normal[1] = 0;
+        normal[2] = 0;
         
         switch(closestObject->kind){
             case 2: // sphere
-                Rdm[0] = Ron[0] - closestObject->position[0];
-                Rdm[1] = Ron[1] - closestObject->position[1];
-                Rdm[2] = Ron[2] - closestObject->position[2];
-                normalize(Rdm);
+                normal[0] = Ron[0] - closestObject->position[0];
+                normal[1] = Ron[1] - closestObject->position[1];
+                normal[2] = Ron[2] - closestObject->position[2];
+                normalize(normal);
                 break;
             case 3: // plane
-                Rdm = closestObject->normal;
-                normalize(Rdm);
+                normal = closestObject->normal;
+                normalize(normal);
                 break;
             default:
                 break;
         }
+        // new reflection vector
+        double* Rdm = malloc(sizeof(double)*3);
+        Rdm[0] = Rd[0] - dot(Rd, normal) * 2 * normal[0];
+        Rdm[1] = Rd[1] - dot(Rd, normal) * 2 * normal[1];
+        Rdm[2] = Rd[2] - dot(Rd, normal) * 2 * normal[2];
         
         double* reflectColor = malloc(sizeof(double)*3);
         reflectColor[0] = 0; // ambient_color[0];
@@ -154,6 +159,11 @@ double* buildColor(Object** objects, Object** lights, double* color, double* Ro,
                     continue;
                 }
             }
+            
+            // adjust new origin to be slightly off of the current surface
+            Ron[0] = 0.01 * Rdm[0];
+            Ron[1] = 0.01 * Rdm[1];
+            Ron[2] = 0.01 * Rdm[2];
             
             // ================================================================(if no shadow)
             if (closestShadowObject == NULL) {
