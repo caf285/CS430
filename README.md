@@ -3,7 +3,8 @@ CS430Project4
 
 How to use:
 -----
-In terminal.
+In terminal, run main to create a 1000 by 1000 pixel ppm file with the command "./main 1000 1000 test.json out.ppm".
+The PPM file can be name whatever you like.
 
 16-11-15
 -----
