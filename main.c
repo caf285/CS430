@@ -3,8 +3,11 @@
 
 #include "deps/linmath.h"
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <string.h>
+#include <math.h>
 #include <assert.h>
 
 typedef struct {
@@ -12,14 +15,19 @@ typedef struct {
     float TexCoord[2];
 } Vertex;
 
+
+
 // (-1, 1)  (1, 1)
 // (-1, -1) (1, -1)
 
 Vertex vertexes[] = {
     {{1, -1}, {0.99999, 0}},
     {{1, 1},  {0.99999, 0.99999}},
-    {{-1, 1}, {0, 0.99999}}
+    {{-1, 1}, {0, 0.99999}},
+    {{-1, -1}, {0, 0}}
 };
+
+
 
 static const char* vertex_shader_text =
 "uniform mat4 MVP;\n"
@@ -70,6 +78,8 @@ void glCompileShaderOrDie(GLuint shader) {
     }
 }
 
+
+
 // 4 x 4 image..
 unsigned char image[] = {
     255, 0, 0, 255,
@@ -93,8 +103,14 @@ unsigned char image[] = {
     255, 0, 255, 255
 };
 
-int main(void)
+int main(int argc, const char * argv[])
 {
+    FILE *FH = fopen("input.ppm", "w+");
+    if (FH == NULL) {                                           // ERROR if file doesn't exists
+        fprintf(stderr, "Error: File doesn't exist.\n");
+        exit(1);
+    }
+    
     GLFWwindow* window;
     GLuint vertex_buffer, vertex_shader, fragment_shader, program;
     GLint mvp_location, vpos_location, vcol_location;
@@ -124,6 +140,7 @@ int main(void)
     
     glGenBuffers(1, &vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+    
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertexes), vertexes, GL_STATIC_DRAW);
     
     vertex_shader = glCreateShader(GL_VERTEX_SHADER);
@@ -177,15 +194,43 @@ int main(void)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA,
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image_width, image_height, 0, GL_RGBA,
                  GL_UNSIGNED_BYTE, image);
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texID);
     glUniform1i(tex_location, 0);
     
+    // Parameters for all image manipulation
+    float objAngle = 0;
+    float objWidth = 1;
+    float objHeight = 1;
+    
     while (!glfwWindowShouldClose(window))
     {
+        
+        // All Key Bindings for Image Control
+        int leftRotation = glfwGetKey(window, GLFW_KEY_Q);
+        int rightRotation = glfwGetKey(window, GLFW_KEY_E);
+        int widthIncrease = glfwGetKey(window, GLFW_KEY_A);
+        int widthDecrease = glfwGetKey(window, GLFW_KEY_D);
+        int heightIncrease = glfwGetKey(window, GLFW_KEY_S);
+        int heightDecrease = glfwGetKey(window, GLFW_KEY_W);
+        
+        // All Actions For Key Binding Control
+        if (leftRotation == GLFW_PRESS)
+            objAngle += .05;
+        if (rightRotation == GLFW_PRESS)
+            objAngle -= .05;
+        if (widthIncrease == GLFW_PRESS)
+            objWidth += .05;
+        if (widthDecrease == GLFW_PRESS)
+            objWidth -= .05;
+        if (heightIncrease == GLFW_PRESS)
+            objHeight += .05;
+        if (heightDecrease == GLFW_PRESS)
+            objHeight -= .05;
+        
         float ratio;
         int width, height;
         mat4x4 m, p, mvp;
@@ -197,13 +242,17 @@ int main(void)
         glClear(GL_COLOR_BUFFER_BIT);
         
         mat4x4_identity(m);
-        mat4x4_rotate_Z(m, m, (float) glfwGetTime());
-        mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
+        
+        mat4x4_rotate_Z(m, m, (float) objAngle);
+        mat4x4_ortho(p, -objWidth, objWidth, objHeight, -objHeight, 1.f, -1.f);
+        //mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
+        
         mat4x4_mul(mvp, p, m);
+        
         
         glUseProgram(program);
         glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) mvp);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawArrays(GL_QUADS, 0, 4);
         
         glfwSwapBuffers(window);
         glfwPollEvents();
