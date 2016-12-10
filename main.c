@@ -74,6 +74,7 @@ void glCompileShaderOrDie(GLuint shader) {
     }
 }
 
+// read ahead in file until next line is reached
 void skipLine(FILE *FH) {
     int c = fgetc(FH);
     while (c != '\n'){
@@ -81,6 +82,8 @@ void skipLine(FILE *FH) {
     }
 }
 
+// read next line into a buffer
+// mainly meant to get x and y values from a ppm image
 char* getNextLine(FILE *FH) {
     char* string = malloc(sizeof(char)*10);
     char* stringPoint = string;
@@ -94,29 +97,42 @@ char* getNextLine(FILE *FH) {
     return string;
 }
 
+// build image buffer
 unsigned char* buildFile(FILE *FH, int x, int y){
+    
+    // image buffer
     unsigned char* image = malloc(sizeof(unsigned char)*100000000);
     unsigned char* imagePoint = image;
+    
+    // string buffer for each line
     char* string = malloc(sizeof(char)*10);
     char* stringPoint = string;
     int c = fgetc(FH);
     int alphaCount = 0;
+    
+    // run for each pixel
     for(int i = x*y*3; i>0; i--){
         
+        // read line
         while (!isspace(c) && c != '\n'){
             *stringPoint++ = c;
             //printf("%c\n", c);
             c = fgetc(FH);
         }
+        
+        // convert line to int for image
         stringPoint = string;
         *imagePoint++ = atoi(stringPoint);
-        //printf("%i\n", *imagePoint++);
+        
+        // reset string buffer for next line
         stringPoint = string;
         while (*stringPoint){
             *stringPoint++ = ' ';
         }
         stringPoint = string;
         c = fgetc(FH);
+        
+        // add alpha channel
         if (alphaCount == 2){
             alphaCount = 0;
             *imagePoint++ = atoi("255");
@@ -129,27 +145,37 @@ unsigned char* buildFile(FILE *FH, int x, int y){
     return image;
 }
 
-
-
 int main(int argc, const char * argv[])
 {
-    FILE *FH = fopen("input.ppm", "rw");                       // open ppm file
-    if (FH == NULL) {                                           // ERROR if file doesn't exists
+    // open file
+    FILE *FH = fopen("input.ppm", "rw");
+    
+    // error if file dowsnt exist
+    if (FH == NULL) {
         fprintf(stderr, "Error: File doesn't exist.\n");
         exit(1);
     }
+    
+    // skip P3
     skipLine(FH);
+    
+    // readppm for X
     int ppmX = atoi(getNextLine(FH));
     printf("%i", ppmX);
     printf("\n");
+    
+    // read ppm for Y
     int ppmY = atoi(getNextLine(FH));
     printf("%i", ppmY);
     printf("\n");
     printf("\n");
+    
+    // skip alpha
     skipLine(FH);
+    
+    // make image buffer
     unsigned char *image = malloc(sizeof(unsigned char)*100000);
     image = buildFile(FH, ppmX, ppmY);
-    
     
     GLFWwindow* window;
     GLuint vertex_buffer, vertex_shader, fragment_shader, program;
@@ -245,6 +271,8 @@ int main(int argc, const char * argv[])
     float objAngle = 0;
     float objWidth = 1;
     float objHeight = 1;
+    float objLeftRight = 0;
+    float objUpDown = 0;
     
     while (!glfwWindowShouldClose(window))
     {
@@ -256,6 +284,10 @@ int main(int argc, const char * argv[])
         int widthDecrease = glfwGetKey(window, GLFW_KEY_D);
         int heightIncrease = glfwGetKey(window, GLFW_KEY_S);
         int heightDecrease = glfwGetKey(window, GLFW_KEY_W);
+        int moveLeft = glfwGetKey(window, GLFW_KEY_T);
+        int moveRight = glfwGetKey(window, GLFW_KEY_F);
+        int moveUp = glfwGetKey(window, GLFW_KEY_R);
+        int moveDown = glfwGetKey(window, GLFW_KEY_G);
         
         // All Actions For Key Binding Control
         if (leftRotation == GLFW_PRESS)
@@ -270,6 +302,15 @@ int main(int argc, const char * argv[])
             objHeight += .05;
         if (heightDecrease == GLFW_PRESS)
             objHeight -= .05;
+        if (moveUp == GLFW_PRESS)
+            objUpDown += 1;
+        if (moveDown == GLFW_PRESS)
+            objUpDown -= 1;
+        if (moveLeft == GLFW_PRESS)
+            objLeftRight += 1;
+        if (moveRight == GLFW_PRESS)
+            objLeftRight -= 1;
+
         
         float ratio;
         int width, height;
@@ -278,14 +319,13 @@ int main(int argc, const char * argv[])
         glfwGetFramebufferSize(window, &width, &height);
         ratio = width / (float) height;
         
-        glViewport(0, 0, width, height);
+        glViewport(objLeftRight, objUpDown, width, height);
         glClear(GL_COLOR_BUFFER_BIT);
         
         mat4x4_identity(m);
         
         mat4x4_rotate_Z(m, m, (float) objAngle);
         mat4x4_ortho(p, -objWidth, objWidth, objHeight, -objHeight, 1.f, -1.f);
-        //mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
         
         mat4x4_mul(mvp, p, m);
         
