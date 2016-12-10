@@ -15,8 +15,6 @@ typedef struct {
     float TexCoord[2];
 } Vertex;
 
-
-
 // (-1, 1)  (1, 1)
 // (-1, -1) (1, -1)
 
@@ -26,8 +24,6 @@ Vertex vertexes[] = {
     {{-1, 1}, {0, 0.99999}},
     {{-1, -1}, {0, 0}}
 };
-
-
 
 static const char* vertex_shader_text =
 "uniform mat4 MVP;\n"
@@ -78,38 +74,82 @@ void glCompileShaderOrDie(GLuint shader) {
     }
 }
 
+void skipLine(FILE *FH) {
+    int c = fgetc(FH);
+    while (c != '\n'){
+        c = fgetc(FH);
+    }
+}
+
+char* getNextLine(FILE *FH) {
+    char* string = malloc(sizeof(char)*10);
+    char* stringPoint = string;
+    int c = fgetc(FH);
+    while (!isspace(c) && c != '\n'){
+        *stringPoint++ = c;
+        printf("%c\n", c);
+        c = fgetc(FH);
+    }
+    *stringPoint = '\0';
+    return string;
+}
+
+unsigned char* buildFile(FILE *FH, int x, int y){
+    unsigned char* image = malloc(sizeof(unsigned char)*100000000);
+    unsigned char* imagePoint = image;
+    char* string = malloc(sizeof(char)*10);
+    char* stringPoint = string;
+    int c = fgetc(FH);
+    int alphaCount = 0;
+    for(int i = x*y*3; i>0; i--){
+        
+        while (!isspace(c) && c != '\n'){
+            *stringPoint++ = c;
+            //printf("%c\n", c);
+            c = fgetc(FH);
+        }
+        stringPoint = string;
+        *imagePoint++ = atoi(stringPoint);
+        //printf("%i\n", *imagePoint++);
+        stringPoint = string;
+        while (*stringPoint){
+            *stringPoint++ = ' ';
+        }
+        stringPoint = string;
+        c = fgetc(FH);
+        if (alphaCount == 2){
+            alphaCount = 0;
+            *imagePoint++ = atoi("255");
+            //printf("---\n");
+        } else {
+            alphaCount += 1;
+            //printf("+++\n");
+        }
+    }
+    return image;
+}
 
 
-// 4 x 4 image..
-unsigned char image[] = {
-    255, 0, 0, 255,
-    255, 0, 0, 255,
-    255, 0, 0, 255,
-    255, 0, 0, 255,
-    
-    0, 255, 0, 255,
-    0, 255, 0, 255,
-    0, 255, 0, 255,
-    0, 255, 0, 255,
-    
-    0, 0, 255, 255,
-    0, 0, 255, 255,
-    0, 0, 255, 255,
-    0, 0, 255, 255,
-    
-    255, 0, 255, 255,
-    255, 0, 255, 255,
-    255, 0, 255, 255,
-    255, 0, 255, 255
-};
 
 int main(int argc, const char * argv[])
 {
-    FILE *FH = fopen("input.ppm", "w+");
+    FILE *FH = fopen("input.ppm", "rw");                       // open ppm file
     if (FH == NULL) {                                           // ERROR if file doesn't exists
         fprintf(stderr, "Error: File doesn't exist.\n");
         exit(1);
     }
+    skipLine(FH);
+    int ppmX = atoi(getNextLine(FH));
+    printf("%i", ppmX);
+    printf("\n");
+    int ppmY = atoi(getNextLine(FH));
+    printf("%i", ppmY);
+    printf("\n");
+    printf("\n");
+    skipLine(FH);
+    unsigned char *image = malloc(sizeof(unsigned char)*100000);
+    image = buildFile(FH, ppmX, ppmY);
+    
     
     GLFWwindow* window;
     GLuint vertex_buffer, vertex_shader, fragment_shader, program;
@@ -185,8 +225,8 @@ int main(int argc, const char * argv[])
                           sizeof(Vertex),
                           (void*) (sizeof(float) * 2));
     
-    int image_width = 4;
-    int image_height = 4;
+    int image_width = ppmX;
+    int image_height = ppmY;
     
     GLuint texID;
     glGenTextures(1, &texID);
