@@ -1,5 +1,20 @@
 # CS430Project5
 
+DEC 9 (final update)
+I cannot figure out how to make these run in terminal. It already took me days in order to get the sample to run. Once that was up and running, I added all of the functionality I could. I am still lerning terminal, but installing and using the GLFW library has been nothing but trouble. I'm assuming I can add a framework or so to the makefile, but nothing seems to be working. I cannot get this to function outside of Xcode.
+
+Anyways. If you can possibly get this to run, I have included an input.ppm. Controls are as follows:
+W - Increase Height
+S - Decrease Height
+A - Decrease Width
+D - Increase Width
+Q - Rotate Right
+E - Rotate Left
+R - Pan Up
+G - Pan Down
+F - Pan Left
+T - Pan Right
+
 DEC 9 (repository update)
 -----
 + Remaining Required Functionality
