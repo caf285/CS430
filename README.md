@@ -1,5 +1,17 @@
 # CS430Project5
 
+DEC 9 (repository update)
+-----
++ Remaining Required Functionality
+  - Keyboard shortcuts for the following quad manipulation: Pan, Shear
+  
++ Updated Functionality
+  - Read loaded PPM file into an image buffer (P3, with added alpha channel)
+  - Apply image to quad. 
+  
++ Comments
+  - Do I get extra credit points for making a raspberry pi retro console? Probably not. OMG are those things cool. As a fellow gamer, I highly recommend.
+  
 DEC 8 (repository update)
 -----
 + Remaining Required Functionality
